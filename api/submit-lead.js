@@ -24,6 +24,8 @@ export default async function handler(req, res) {
     const result = await handleSubmitLead(body, process.env, {
       origin,
       ip: getClientIp(req.headers),
+      referer: req.headers.referer || req.headers.referrer || '',
+      host: req.headers.host || req.headers.Host || '',
     })
     res.status(result.status).json(result.body)
   } catch (err) {

@@ -10,8 +10,11 @@ import {
 const ISO_RE =
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/
 
-export async function handleSubmitLead(body, env, { origin, ip } = {}) {
-  if (env.NODE_ENV === 'production' && !isAllowedOrigin(origin, env)) {
+export async function handleSubmitLead(body, env, { origin, ip, referer, host } = {}) {
+  if (
+    env.NODE_ENV === 'production' &&
+    !isAllowedOrigin(origin, env, { referer, host })
+  ) {
     return { status: 403, body: { error: 'Forbidden' } }
   }
 

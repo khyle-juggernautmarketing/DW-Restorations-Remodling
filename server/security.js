@@ -42,19 +42,57 @@ export function checkRateLimit(key, { limit = 10, windowMs = 60_000 } = {}) {
   return { allowed: true, retryAfterMs: 0 }
 }
 
-export function isAllowedOrigin(origin, env) {
-  if (!origin) return env.NODE_ENV !== 'production'
+const VERCEL_PROJECT_HOST =
+  /^dw-restorations-remodling(-[a-z0-9]+)?\.vercel\.app$/i
+
+function hostnameFromUrl(value) {
+  try {
+    return new URL(value).hostname
+  } catch {
+    return ''
+  }
+}
+
+function isAllowedHostname(hostname) {
+  if (!hostname) return false
+  if (hostname === 'localhost' || hostname === '127.0.0.1') return true
+  return VERCEL_PROJECT_HOST.test(hostname)
+}
+
+export function isAllowedOrigin(origin, env, { referer, host } = {}) {
+  if (env.NODE_ENV !== 'production') return true
 
   const allowed = (env.ALLOWED_ORIGINS || '')
     .split(',')
     .map((o) => o.trim())
     .filter(Boolean)
 
-  if (allowed.length === 0) {
-    return env.NODE_ENV !== 'production'
+  const hostnames = new Set()
+
+  if (origin) hostnames.add(hostnameFromUrl(origin))
+  if (referer) hostnames.add(hostnameFromUrl(referer))
+  if (host) hostnames.add(host.split(':')[0])
+
+  for (const hostname of hostnames) {
+    if (isAllowedHostname(hostname)) return true
+    if (
+      allowed.some((entry) => {
+        const allowedHost = hostnameFromUrl(
+          entry.startsWith('http') ? entry : `https://${entry}`,
+        )
+        return allowedHost && hostname === allowedHost
+      })
+    ) {
+      return true
+    }
   }
 
-  return allowed.some((o) => origin === o || origin.endsWith(o))
+  // Same-origin fetch often omits Origin; allow when Host matches our deployment
+  if (hostnames.size === 0 && host && isAllowedHostname(host.split(':')[0])) {
+    return true
+  }
+
+  return allowed.length === 0
 }
 
 export function validateWebhookConfig(env) {
