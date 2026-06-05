@@ -21,7 +21,6 @@ import {
   getEstDateKey,
   loadPendingLead,
   markPendingSubmitted,
-  reserveBooking,
   savePendingLead,
 } from '../lib/booking'
 import AppointmentCalendar from './AppointmentCalendar'
@@ -172,13 +171,6 @@ export default function LeadForm() {
     setError('')
 
     try {
-      await reserveBooking({
-        isoStart: appointmentIso,
-        name: contact.name.trim(),
-        email: contact.email.trim(),
-        phone: contact.phone.trim(),
-      })
-
       if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current)
 
       const dateKey = getEstDateKey(new Date(appointmentIso))

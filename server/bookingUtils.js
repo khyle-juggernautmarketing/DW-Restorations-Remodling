@@ -143,13 +143,44 @@ export function generateDaySlots(dateKey, now = new Date()) {
   return slots
 }
 
+export function normalizeSlotMs(isoStart) {
+  const ms = new Date(isoStart).getTime()
+  if (Number.isNaN(ms)) return null
+  const slotMs = SLOT_MINUTES * 60 * 1000
+  return Math.floor(ms / slotMs) * slotMs
+}
+
+export function isIsoBookable(isoStart, now = new Date()) {
+  const startMs = new Date(isoStart).getTime()
+  // Allow a short grace window while the user confirms on the calendar step
+  if (Number.isNaN(startMs) || startMs <= now.getTime() - 120_000) return false
+
+  const dateKey = getEstDateKey(new Date(isoStart))
+  const dateKeys = getBookableDateKeys(now)
+  if (!dateKeys.includes(dateKey)) return false
+
+  const hours = getDayHours(dateKey)
+  if (!hours) return false
+
+  const parts = getEstParts(new Date(isoStart))
+  const slotMinutes = parts.hour * 60 + parts.minute
+  const firstStart = hours.open * 60
+  const lastStart = hours.close * 60 - BLOCK_MINUTES
+
+  if (slotMinutes < firstStart || slotMinutes > lastStart) return false
+  if (slotMinutes % SLOT_MINUTES !== 0) return false
+
+  return normalizeSlotMs(isoStart) === startMs
+}
+
 export function getBlockedIsoStarts(bookings = []) {
   const blocked = new Set()
 
   for (const booking of bookings) {
-    const startMs = new Date(booking.isoStart).getTime()
+    const bookingMs = normalizeSlotMs(booking.isoStart)
+    if (bookingMs === null) continue
     for (let i = 0; i < BLOCK_SLOTS; i += 1) {
-      blocked.add(new Date(startMs + i * SLOT_MINUTES * 60 * 1000).toISOString())
+      blocked.add(bookingMs + i * SLOT_MINUTES * 60 * 1000)
     }
   }
 
@@ -158,10 +189,14 @@ export function getBlockedIsoStarts(bookings = []) {
 
 export function filterAvailableSlots(slots, bookings = []) {
   const blocked = getBlockedIsoStarts(bookings)
-  return slots.filter((slot) => !blocked.has(slot.isoStart))
+  return slots.filter((slot) => {
+    const slotMs = normalizeSlotMs(slot.isoStart)
+    return slotMs !== null && !blocked.has(slotMs)
+  })
 }
 
 export function isSlotAvailable(isoStart, bookings = []) {
-  const blocked = getBlockedIsoStarts(bookings)
-  return !blocked.has(isoStart)
+  const targetMs = normalizeSlotMs(isoStart)
+  if (targetMs === null) return false
+  return !getBlockedIsoStarts(bookings).has(targetMs)
 }

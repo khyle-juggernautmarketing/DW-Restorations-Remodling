@@ -1,7 +1,6 @@
 import { pruneOldBookings, addBooking } from '../server/bookingStore.js'
 import {
-  generateDaySlots,
-  getBookableDateKeys,
+  isIsoBookable,
   isSlotAvailable,
 } from '../server/bookingUtils.js'
 import {
@@ -36,7 +35,7 @@ export default async function handler(req, res) {
     const bookings = await pruneOldBookings(process.env)
 
     if (req.method === 'GET') {
-      const rate = checkRateLimit(`bookings-get:${ip}`, { limit: 30, windowMs: 60_000 })
+      const rate = checkRateLimit(`bookings-get:${ip}`, { limit: 60, windowMs: 60_000 })
       if (!rate.allowed) {
         res.status(429).json({ error: 'Too many requests. Please try again later.' })
         return
@@ -47,7 +46,7 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
-      const rate = checkRateLimit(`bookings-post:${ip}`, { limit: 8, windowMs: 60_000 })
+      const rate = checkRateLimit(`bookings-post:${ip}`, { limit: 10, windowMs: 60_000 })
       if (!rate.allowed) {
         res.status(429).json({ error: 'Too many requests. Please try again later.' })
         return
@@ -79,17 +78,13 @@ export default async function handler(req, res) {
         return
       }
 
-      if (!isSlotAvailable(cleanIso, bookings)) {
-        res.status(409).json({ error: 'That time slot is no longer available.' })
+      if (!isIsoBookable(cleanIso)) {
+        res.status(400).json({ error: 'Invalid appointment time.' })
         return
       }
 
-      const dateKeys = getBookableDateKeys()
-      const allowed = dateKeys.some((key) =>
-        generateDaySlots(key).some((slot) => slot.isoStart === cleanIso),
-      )
-      if (!allowed) {
-        res.status(400).json({ error: 'Invalid appointment time.' })
+      if (!isSlotAvailable(cleanIso, bookings)) {
+        res.status(409).json({ error: 'That time slot is no longer available.' })
         return
       }
 

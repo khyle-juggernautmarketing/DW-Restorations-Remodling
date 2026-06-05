@@ -46,9 +46,23 @@ export async function listBookings(env) {
   return getMemoryStore()
 }
 
+export async function removeBooking(env, isoStart) {
+  const targetMs = new Date(isoStart).getTime()
+  const bookings = await listBookings(env)
+  const filtered = bookings.filter((b) => new Date(b.isoStart).getTime() !== targetMs)
+  if (filtered.length === bookings.length) return false
+
+  await writeToKv(env, filtered)
+  globalThis.__dwBookings = filtered
+  return true
+}
+
 export async function addBooking(env, booking) {
   const bookings = await listBookings(env)
-  const exists = bookings.some((b) => b.isoStart === booking.isoStart)
+  const bookingMs = new Date(booking.isoStart).getTime()
+  const exists = bookings.some(
+    (b) => new Date(b.isoStart).getTime() === bookingMs,
+  )
   if (exists) {
     throw new Error('That time slot is no longer available.')
   }
@@ -57,7 +71,7 @@ export async function addBooking(env, booking) {
   const saved = await writeToKv(env, bookings)
   if (!saved) {
     const memory = getMemoryStore()
-    if (!memory.some((b) => b.isoStart === booking.isoStart)) {
+    if (!memory.some((b) => new Date(b.isoStart).getTime() === bookingMs)) {
       memory.push(booking)
     }
   }

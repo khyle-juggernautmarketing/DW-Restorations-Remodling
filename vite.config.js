@@ -64,10 +64,7 @@ function devApiPlugin() {
           try {
             const parsed = await readBody(req)
             const result = await handleSubmitLead(parsed, processEnv, {
-              origin,
               ip: req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress,
-              referer: req.headers.referer || '',
-              host: req.headers.host || '',
             })
             res.statusCode = result.status
             res.setHeader('Content-Type', 'application/json')
